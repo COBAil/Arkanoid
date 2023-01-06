@@ -5,6 +5,7 @@ from time import time
 import tkinter
 import sys
 import os
+import sqlite3
 
 
 def resource_path(relative_path):
@@ -84,6 +85,9 @@ class App:
         self.WIDTH = int(screen_width * (15 / 64))
         self.HEIGHT = int(screen_height * (5 / 6))
 
+        # database
+        self.CONN = sqlite3.connect('player_data.db')
+
         # base parameters of window
         self.SCREEN = pygame.display.set_mode((self.WIDTH, self.HEIGHT))
         self.CLOCK = pygame.time.Clock()
@@ -103,7 +107,8 @@ class App:
         self.FONT_RESTART_INSCRIPTION = pygame.font.Font(self.FONT, self.HEIGHT // 40)
         self.FONT_EXIT_MENU = pygame.font.Font(self.FONT, self.HEIGHT // 24)
 
-        self.FONT_MENU = pygame.font.Font(self.FONT, self.HEIGHT // 20)
+        self.FONT_HIGH_SCORE = pygame.font.Font(self.FONT, 20)
+        self.FONT_START = pygame.font.Font(self.FONT, self.HEIGHT // 20)
         self.FONT_SETTINGS = pygame.font.Font(self.FONT, self.HEIGHT // 30)
 
         self.FONT_BACK = pygame.font.Font(self.FONT, self.HEIGHT // 24)
@@ -305,7 +310,8 @@ class App:
         start_sound = pygame.mixer.Sound(self.START_SOUND)
 
         # rectangles
-        rect_best_score = pygame.Rect(10, 10, 10, 10)
+        rect_high_score = pygame.Rect(int(self.WIDTH // 60), int(self.HEIGHT // 120),
+                                      int(self.WIDTH * (5 / 12)), int(self.HEIGHT // 16))
         rect_start = pygame.Rect(int(self.WIDTH * (7 / 24)), int(self.HEIGHT * (13 / 24)),
                                  int(self.WIDTH * (5 / 12)), self.HEIGHT // 8)
         rect_settings = pygame.Rect(int(self.WIDTH * (7 / 24)), int(self.HEIGHT * (17 / 24)),
@@ -338,12 +344,20 @@ class App:
                         App(None).display_settings(True)
 
             # draw rectangles and display inscriptions
-            pygame.draw.rect(self.SCREEN, (0, 0, 0), rect_best_score, border_radius=int(self.WIDTH * (3 / 40)))
-            render_start_inscription = self.FONT_MENU.render('BEST SCORE', True, (255, 255, 255))
-            self.SCREEN.blit(render_start_inscription, (10, 10))
+            pygame.draw.rect(self.SCREEN, (0, 0, 0), rect_high_score, border_radius=int(self.WIDTH * (3 / 40)))
+            high_score = self.CONN.cursor().execute("SELECT high_score FROM HighScoreAndTime").fetchone()[0]
+            render_high_score_inscription = self.FONT_HIGH_SCORE.render(
+                f'HIGH SCORE: {high_score}', True, (255, 255, 255))
+            self.SCREEN.blit(render_high_score_inscription, (int(self.WIDTH // 20), int(self.HEIGHT // 80)))
+
+            game_session_time = self.CONN.cursor().execute(
+                "SELECT game_session_time FROM HighScoreAndTime").fetchone()[0]
+            render_game_session_time_inscription = self.FONT_HIGH_SCORE.render(
+                f'TIME: {game_session_time}', True, (255, 255, 255))
+            self.SCREEN.blit(render_game_session_time_inscription, (int(self.WIDTH // 20), int(self.HEIGHT * (3 / 80))))
 
             pygame.draw.rect(self.SCREEN, black_start, rect_start, border_radius=int(self.WIDTH * (3 / 40)))
-            render_start_inscription = self.FONT_MENU.render('START', True, white_start)
+            render_start_inscription = self.FONT_START.render('START', True, white_start)
             self.SCREEN.blit(render_start_inscription, (int(self.WIDTH * (19 / 60)), int(self.HEIGHT * (133 / 240))))
 
             pygame.draw.rect(self.SCREEN, black_settings, rect_settings, border_radius=int(self.WIDTH * (3 / 40)))
@@ -514,6 +528,11 @@ class App:
         self.SCREEN.blit(pygame.image.load(change_background_image()), (0, 0))
 
     def display_end_inscription(self, inscription, score, width, game_session_time):
+        if score > self.CONN.cursor().execute(f'SELECT high_score FROM HighScoreAndTime').fetchone()[0]:
+            self.CONN.cursor().execute(f'UPDATE HighScoreAndTime SET high_score = {score}')
+            self.CONN.cursor().execute(f'UPDATE HighScoreAndTime SET game_session_time = "{game_session_time}"')
+            self.CONN.commit()
+
         self.BALL_SPEED = 0
 
         self.SCREEN.blit(pygame.image.load(change_background_image()), (0, 0))
